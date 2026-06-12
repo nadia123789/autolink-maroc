@@ -1,0 +1,33 @@
+{
+  "name": "autolink-maroc-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@formatjs/icu-messageformat-parser": "^2.7.0",
+    "axios": "^1.6.0",
+    "framer-motion": "^12.40.0",
+    "i18next": "^23.7.0",
+    "i18next-browser-languagedetector": "^7.2.0",
+    "i18next-icu": "^2.3.0",
+    "lucide-react": "^1.17.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-i18next": "^13.5.0",
+    "react-router-dom": "^6.18.0",
+    "react-scripts": "5.0.1"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build"
+  },
+  "proxy": "http://localhost:5000",
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead"
+    ],
+    "development": [
+      "last 1 chrome version"
+    ]
+  }
+}
