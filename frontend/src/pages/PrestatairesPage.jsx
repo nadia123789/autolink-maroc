@@ -97,17 +97,27 @@ function PrestateurCard({ p, index }) {
           
           {/* Header - Logo/Categorie */}
           <div style={{
-            height: '100px',
+            height: '120px',
             background: `linear-gradient(135deg, ${catInfo.color}10 0%, ${catInfo.color}05 100%)`,
             borderRadius: '16px',
             marginBottom: '20px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            overflow: 'hidden',
             border: `1px solid ${catInfo.color}20`
           }}>
             {p.logo ? (
-              <img src={p.logo} alt={p.nom} style={{ height: '70px', objectFit: 'contain' }} />
+              <img 
+                src={p.logo} 
+                alt={p.nom} 
+                style={{ 
+                  width: '100%', 
+                  height: '100%', 
+                  objectFit: 'contain',
+                  padding: '4px'
+                }} 
+              />
             ) : (
               <Icon size={48} color={catInfo.color} />
             )}

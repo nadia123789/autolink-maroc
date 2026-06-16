@@ -1,5 +1,7 @@
 const db = require('../config/db');
 const bcrypt = require('bcryptjs');
+const fs = require('fs');
+const path = require('path');
 
 // ── PROFIL ÉTABLISSEMENT ─────────────────────────────────────
 
@@ -10,7 +12,10 @@ const getProfil = async (req, res) => {
     if (!rows.length) return res.json(null);
     const [photos] = await db.query('SELECT * FROM photos_prestataires WHERE prestataire_id = ? ORDER BY est_principale DESC', [rows[0].id]);
     res.json({ ...rows[0], photos });
-  } catch (err) { res.status(500).json({ message: 'Erreur serveur.' }); }
+  } catch (err) { 
+    console.error('Get profil error:', err);
+    res.status(500).json({ message: 'Erreur serveur.' }); 
+  }
 };
 
 // PUT /api/gestionnaire/profil
@@ -33,7 +38,102 @@ const updateProfil = async (req, res) => {
       );
     }
     res.json({ message: 'Profil mis à jour.' });
-  } catch (err) { res.status(500).json({ message: 'Erreur serveur.' }); }
+  } catch (err) { 
+    console.error('Update profil error:', err);
+    res.status(500).json({ message: 'Erreur serveur.' }); 
+  }
+};
+
+// ── LOGO UPLOAD ──────────────────────────────────────────────
+
+// POST /api/gestionnaire/logo
+const uploadLogo = async (req, res) => {
+  try {
+    // Check if file was uploaded
+    if (!req.file) {
+      return res.status(400).json({ message: 'Aucun fichier téléchargé.' });
+    }
+
+    const [prest] = await db.query('SELECT id, logo FROM prestataires WHERE gestionnaire_id = ?', [req.user.id]);
+    if (!prest.length) {
+      return res.status(400).json({ message: 'Aucun établissement trouvé.' });
+    }
+
+    const prestataireId = prest[0].id;
+    const oldLogo = prest[0].logo;
+    
+    // Create uploads directory if it doesn't exist
+    const uploadDir = path.join(__dirname, '../uploads/logos');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    // Generate unique filename
+    const ext = path.extname(req.file.originalname);
+    const filename = `logo_${prestataireId}_${Date.now()}${ext}`;
+    const filepath = path.join(uploadDir, filename);
+
+    // Save file
+    fs.writeFileSync(filepath, req.file.buffer);
+
+    // URL to access the logo
+    const logoPath = `/uploads/logos/${filename}`;
+
+    // Delete old logo if exists
+    if (oldLogo) {
+      const oldPath = path.join(__dirname, '..', oldLogo);
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+      }
+    }
+
+    // Update database
+    await db.query(
+      'UPDATE prestataires SET logo = ? WHERE id = ?',
+      [logoPath, prestataireId]
+    );
+
+    res.json({ 
+      message: 'Logo téléchargé avec succès.', 
+      logo: logoPath 
+    });
+
+  } catch (err) {
+    console.error('Upload logo error:', err);
+    res.status(500).json({ message: 'Erreur lors du téléchargement du logo.' });
+  }
+};
+
+// DELETE /api/gestionnaire/logo
+const deleteLogo = async (req, res) => {
+  try {
+    const [prest] = await db.query('SELECT id, logo FROM prestataires WHERE gestionnaire_id = ?', [req.user.id]);
+    if (!prest.length) {
+      return res.status(400).json({ message: 'Aucun établissement trouvé.' });
+    }
+
+    const prestataire = prest[0];
+    
+    if (prestataire.logo) {
+      // Delete file from filesystem
+      const filepath = path.join(__dirname, '..', prestataire.logo);
+      if (fs.existsSync(filepath)) {
+        fs.unlinkSync(filepath);
+      }
+      
+      // Remove from database
+      await db.query(
+        'UPDATE prestataires SET logo = NULL WHERE id = ?',
+        [prestataire.id]
+      );
+    }
+
+    res.json({ message: 'Logo supprimé avec succès.' });
+
+  } catch (err) {
+    console.error('Delete logo error:', err);
+    res.status(500).json({ message: 'Erreur lors de la suppression du logo.' });
+  }
 };
 
 // ── CATALOGUE PRESTATIONS ────────────────────────────────────
@@ -45,7 +145,10 @@ const getPrestations = async (req, res) => {
     if (!prest.length) return res.json([]);
     const [rows] = await db.query('SELECT * FROM prestations WHERE prestataire_id = ? ORDER BY categorie,nom', [prest[0].id]);
     res.json(rows);
-  } catch (err) { res.status(500).json({ message: 'Erreur serveur.' }); }
+  } catch (err) { 
+    console.error('Get prestations error:', err);
+    res.status(500).json({ message: 'Erreur serveur.' }); 
+  }
 };
 
 // POST /api/gestionnaire/prestations
@@ -59,7 +162,10 @@ const createPrestation = async (req, res) => {
       [prest[0].id, nom, description, categorie, prix_min, prix_max, duree_minutes]
     );
     res.status(201).json({ message: 'Prestation créée.', id: result.insertId });
-  } catch (err) { res.status(500).json({ message: 'Erreur serveur.' }); }
+  } catch (err) { 
+    console.error('Create prestation error:', err);
+    res.status(500).json({ message: 'Erreur serveur.' }); 
+  }
 };
 
 // PUT /api/gestionnaire/prestations/:id
@@ -72,7 +178,10 @@ const updatePrestation = async (req, res) => {
       [nom, description, categorie, prix_min, prix_max, duree_minutes, est_disponible, req.params.id, req.user.id]
     );
     res.json({ message: 'Prestation mise à jour.' });
-  } catch (err) { res.status(500).json({ message: 'Erreur serveur.' }); }
+  } catch (err) { 
+    console.error('Update prestation error:', err);
+    res.status(500).json({ message: 'Erreur serveur.' }); 
+  }
 };
 
 // DELETE /api/gestionnaire/prestations/:id
@@ -83,7 +192,10 @@ const deletePrestation = async (req, res) => {
       [req.params.id, req.user.id]
     );
     res.json({ message: 'Prestation supprimée.' });
-  } catch (err) { res.status(500).json({ message: 'Erreur serveur.' }); }
+  } catch (err) { 
+    console.error('Delete prestation error:', err);
+    res.status(500).json({ message: 'Erreur serveur.' }); 
+  }
 };
 
 // ── TECHNICIENS ──────────────────────────────────────────────
@@ -100,7 +212,10 @@ const getTechniciens = async (req, res) => {
       [prest[0].id]
     );
     res.json(rows);
-  } catch (err) { res.status(500).json({ message: 'Erreur serveur.' }); }
+  } catch (err) { 
+    console.error('Get techniciens error:', err);
+    res.status(500).json({ message: 'Erreur serveur.' }); 
+  }
 };
 
 // POST /api/gestionnaire/techniciens - Créer compte technicien
@@ -128,6 +243,7 @@ const createTechnicien = async (req, res) => {
     res.status(201).json({ message: 'Technicien créé.', user_id: userRes.insertId, tech_id: techRes.insertId });
   } catch (err) {
     await conn.rollback();
+    console.error('Create technicien error:', err);
     res.status(500).json({ message: 'Erreur serveur.' });
   } finally { conn.release(); }
 };
@@ -142,7 +258,10 @@ const updateTechnicien = async (req, res) => {
       [JSON.stringify(specialites), disponible, req.params.id, req.user.id]
     );
     res.json({ message: 'Technicien mis à jour.' });
-  } catch (err) { res.status(500).json({ message: 'Erreur serveur.' }); }
+  } catch (err) { 
+    console.error('Update technicien error:', err);
+    res.status(500).json({ message: 'Erreur serveur.' }); 
+  }
 };
 
 // DELETE /api/gestionnaire/techniciens/:id
@@ -156,7 +275,10 @@ const deleteTechnicien = async (req, res) => {
     await db.query('DELETE FROM techniciens WHERE id = ?', [req.params.id]);
     await db.query('DELETE FROM users WHERE id = ?', [rows[0].user_id]);
     res.json({ message: 'Technicien supprimé.' });
-  } catch (err) { res.status(500).json({ message: 'Erreur serveur.' }); }
+  } catch (err) { 
+    console.error('Delete technicien error:', err);
+    res.status(500).json({ message: 'Erreur serveur.' }); 
+  }
 };
 
 // ── ASSIGNER TECHNICIEN À UN RDV ─────────────────────────────
@@ -165,7 +287,6 @@ const assignerTechnicien = async (req, res) => {
   const { technicien_id } = req.body;
 
   try {
-
     console.log('RDV =', req.params.id);
     console.log('TECH =', technicien_id);
 
@@ -179,20 +300,15 @@ const assignerTechnicien = async (req, res) => {
     console.log('ORDRE EXISTANT =', ordre);
 
     if (ordre.length) {
-
       console.log('UPDATE ordre');
-
       await db.query(
         `UPDATE ordres_intervention
          SET technicien_id=?
          WHERE rendez_vous_id=?`,
         [technicien_id, req.params.id]
       );
-
     } else {
-
       console.log('INSERT ordre');
-
       const [insert] = await db.query(
         `
         INSERT INTO ordres_intervention
@@ -206,9 +322,7 @@ const assignerTechnicien = async (req, res) => {
         `,
         [req.params.id, technicien_id]
       );
-
       console.log('INSERT RESULT =', insert);
-
     }
 
     const [check] = await db.query(
@@ -235,15 +349,13 @@ const assignerTechnicien = async (req, res) => {
     return res.json({ message:'ok' });
 
   } catch(err) {
-
     console.error('ERREUR ASSIGN =', err);
-
     return res.status(500).json({
       message: err.message
     });
-
   }
 };
+
 // ── FICHES CLIENTS ───────────────────────────────────────────
 
 // GET /api/gestionnaire/clients
@@ -264,7 +376,10 @@ const getClients = async (req, res) => {
       [prest[0].id]
     );
     res.json(rows);
-  } catch (err) { res.status(500).json({ message: 'Erreur serveur.' }); }
+  } catch (err) { 
+    console.error('Get clients error:', err);
+    res.status(500).json({ message: 'Erreur serveur.' }); 
+  }
 };
 
 // GET /api/gestionnaire/clients/:id - Fiche client détaillée
@@ -284,8 +399,12 @@ const getClientDetail = async (req, res) => {
     );
     const [vehicules] = await db.query('SELECT * FROM vehicules WHERE client_id=?', [req.params.id]);
     res.json({ ...user[0], rdv, vehicules });
-  } catch (err) { res.status(500).json({ message: 'Erreur serveur.' }); }
+  } catch (err) { 
+    console.error('Get client detail error:', err);
+    res.status(500).json({ message: 'Erreur serveur.' }); 
+  }
 };
+
 // GET /api/gestionnaire/diagnostics
 const getDiagnostics = async (req, res) => {
   try {
@@ -340,14 +459,26 @@ const getDiagnostics = async (req, res) => {
 
     res.json(rows);
   } catch (err) {
-    console.error(err);
+    console.error('Get diagnostics error:', err);
     res.status(500).json({ message: 'Erreur serveur.' });
   }
 };
+
 module.exports = {
-  getProfil, updateProfil,
-  getPrestations, createPrestation, updatePrestation, deletePrestation,
-  getTechniciens, createTechnicien, updateTechnicien, deleteTechnicien,
+  getProfil, 
+  updateProfil,
+  uploadLogo,
+  deleteLogo,
+  getPrestations, 
+  createPrestation, 
+  updatePrestation, 
+  deletePrestation,
+  getTechniciens, 
+  createTechnicien, 
+  updateTechnicien, 
+  deleteTechnicien,
   assignerTechnicien,
-  getClients, getClientDetail, getDiagnostics,
+  getClients, 
+  getClientDetail, 
+  getDiagnostics,
 };

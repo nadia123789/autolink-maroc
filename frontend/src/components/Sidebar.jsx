@@ -17,7 +17,8 @@ import {
   UserCog,
   Store,
   LogOut,
-  UserCircle
+  UserCircle,
+  Home
 } from 'lucide-react';
 
 const menuClient = [
@@ -26,7 +27,7 @@ const menuClient = [
   { label: 'Mes rendez-vous',   icon: Calendar,        to: '/client/rdv' },
   { label: 'Suivi temps réel',  icon: Wrench,          to: '/client/suivi' },
   { label: 'Mes devis',         icon: FileText,        to: '/client/devis' },
-  { label: 'Paiements',icon: CreditCard,      to: '/client/paiement' },
+  { label: 'Paiements',         icon: CreditCard,      to: '/client/paiement' },
   { label: 'Notifications',     icon: Bell,            to: '/client/notifications' },
 ];
 
@@ -40,7 +41,6 @@ const menuGestionnaire = [
   { label: 'Devis & Factures',  icon: FileText,        to: '/gestionnaire/devis' },
   { label: 'Stock pièces',      icon: Package,         to: '/gestionnaire/stock' },
   { label: 'Promotions',        icon: Gift,            to: '/gestionnaire/promotions' },
-  
 ];
 
 const menuTechnicien = [
@@ -69,11 +69,46 @@ export default function Sidebar() {
       <div className="sidebar-logo">
         AutoLink <span style={{ color: 'var(--white)', fontWeight: 400 }}>Maroc</span>
       </div>
+      
+      {/* Home Button */}
+      <div style={{ padding: '16px', borderBottom: '1px solid var(--dark-4)' }}>
+        <button
+          onClick={() => navigate('/')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            width: '100%',
+            padding: '10px 16px',
+            borderRadius: '10px',
+            background: 'rgba(220, 38, 38, 0.1)',
+            border: '1px solid rgba(220, 38, 38, 0.2)',
+            color: '#dc2626',
+            cursor: 'pointer',
+            transition: 'all 0.3s',
+            fontWeight: 600,
+            fontSize: '14px'
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = 'rgba(220, 38, 38, 0.2)';
+            e.currentTarget.style.borderColor = '#dc2626';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'rgba(220, 38, 38, 0.1)';
+            e.currentTarget.style.borderColor = 'rgba(220, 38, 38, 0.2)';
+          }}
+        >
+          <Home size={20} />
+          Retour à l'accueil
+        </button>
+      </div>
+
       <div style={{ padding: '0 16px 16px', borderBottom: '1px solid var(--dark-4)' }}>
         <div style={{ fontSize: '13px', color: 'var(--gray-light)' }}>Connecté en tant que</div>
         <div style={{ fontWeight: 600, marginTop: '2px' }}>{user?.prenom} {user?.nom}</div>
         <span className="badge badge-gold" style={{ marginTop: '6px' }}>{user?.role}</span>
       </div>
+      
       <nav className="sidebar-section" style={{ flex: 1 }}>
         {menu.map(item => {
           const IconComponent = item.icon;
@@ -92,6 +127,7 @@ export default function Sidebar() {
           );
         })}
       </nav>
+      
       <div style={{ padding: '16px', borderTop: '1px solid var(--dark-4)' }}>
         <button
           onClick={() => { deconnexion(); navigate('/'); }}

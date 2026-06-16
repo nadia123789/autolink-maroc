@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Building2, 
@@ -8,16 +8,11 @@ import {
   Plus, 
   Edit2, 
   Trash2,
-  XCircle,
-  MapPin,
-  Phone,
-  Mail,
-  Calendar,
+  X,
   DollarSign,
   AlertCircle,
-  CheckCircle,
-  X,
-  ChevronRight
+  Upload,
+  Trash
 } from 'lucide-react';
 import Sidebar from '../../components/Sidebar';
 import api from '../../utils/api';
@@ -38,6 +33,226 @@ const staggerContainer = {
     }
   }
 };
+
+// ── Logo Upload Component ──
+function LogoUpload({ logo, onLogoUpdate }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+  const [preview, setPreview] = useState(logo);
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    setPreview(logo);
+  }, [logo]);
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      setError('Seuls les formats JPEG, PNG, GIF et WEBP sont autorisés.');
+      return;
+    }
+
+    // Validate file size (2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      setError('Le fichier ne doit pas dépasser 2MB.');
+      return;
+    }
+
+    // Preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setPreview(e.target.result);
+    };
+    reader.readAsDataURL(file);
+
+    // Upload
+    setUploading(true);
+    setError('');
+
+    const formData = new FormData();
+    formData.append('logo', file);
+
+    try {
+      const response = await api.post('/gestionnaire/logo', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      onLogoUpdate(response.data.logo);
+      setPreview(response.data.logo);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Erreur lors du téléchargement.');
+      setPreview(logo);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    if (!window.confirm('Supprimer le logo ?')) return;
+    
+    setUploading(true);
+    try {
+      await api.delete('/gestionnaire/logo');
+      onLogoUpdate(null);
+      setPreview(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (err) {
+      setError('Erreur lors de la suppression.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div style={{ marginBottom: '20px' }}>
+      <label style={{ color: '#ef4444', display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 500 }}>
+        Logo de l'établissement
+      </label>
+      
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '20px',
+        padding: '16px',
+        background: '#111111',
+        borderRadius: '12px',
+        border: '1px solid #2a2a2a'
+      }}>
+        {/* Logo preview */}
+        <div style={{
+          width: '80px',
+          height: '80px',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          background: '#2a2a2a',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          border: '2px solid #3a3a3a'
+        }}>
+          {preview ? (
+            <img 
+              src={preview.startsWith('http') ? preview : `http://localhost:5000${preview}`}
+              alt="Logo"
+              style={{ 
+                width: '100%', 
+                height: '100%', 
+                objectFit: 'cover'
+              }}
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.parentElement.innerHTML = '<Building2 size={32} color="#4b5563" />';
+              }}
+            />
+          ) : (
+            <Building2 size={32} color="#4b5563" />
+          )}
+        </div>
+
+        {/* Upload controls */}
+        <div style={{ flex: 1 }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileSelect}
+            style={{ display: 'none' }}
+            id="logo-upload"
+          />
+          
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+                border: 'none',
+                borderRadius: '8px',
+                color: 'white',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: 500,
+                opacity: uploading ? 0.6 : 1
+              }}
+            >
+              {uploading ? (
+                <>
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity }}
+                  >
+                    <Clock size={16} />
+                  </motion.div>
+                  Téléchargement...
+                </>
+              ) : (
+                <>
+                  <Upload size={16} />
+                  {preview ? 'Changer le logo' : 'Ajouter un logo'}
+                </>
+              )}
+            </motion.button>
+
+            {preview && (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleRemoveLogo}
+                disabled={uploading}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 16px',
+                  background: 'transparent',
+                  border: '1px solid #dc2626',
+                  borderRadius: '8px',
+                  color: '#ef4444',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  opacity: uploading ? 0.6 : 1
+                }}
+              >
+                <Trash size={16} />
+                Supprimer
+              </motion.button>
+            )}
+          </div>
+
+          {error && (
+            <div style={{ 
+              color: '#fca5a5', 
+              fontSize: '12px', 
+              marginTop: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              <AlertCircle size={14} />
+              {error}
+            </div>
+          )}
+          
+          <div style={{ color: '#6b7280', fontSize: '11px', marginTop: '6px' }}>
+            Formats acceptés : JPEG, PNG, GIF, WEBP • Max 2MB
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Modal prestation ──
 function PrestationModal({ p, onClose, onSave }) {
@@ -164,28 +379,61 @@ function PrestationModal({ p, onClose, onSave }) {
   );
 }
 
+// ── Main Component ──
 export default function GestProfil() {
-  const [tab, setTab]               = useState('profil');
-  const [profil, setProfil]         = useState(null);
+  const [tab, setTab] = useState('profil');
+  const [profil, setProfil] = useState(null);
   const [prestations, setPrestations] = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [saving, setSaving]         = useState(false);
-  const [modal, setModal]           = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [modal, setModal] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
-  const [msg, setMsg]               = useState('');
+  const [msg, setMsg] = useState('');
 
   const [form, setForm] = useState({
-    nom:'', description:'', categorie:'garage', telephone:'', email:'',
-    adresse:'', ville:'', latitude:'', longitude:'',
-    horaires: { lun:'08:00-18:00', mar:'08:00-18:00', mer:'08:00-18:00', jeu:'08:00-18:00', ven:'08:00-18:00', sam:'08:00-14:00', dim:'Fermé' }
+    nom: '',
+    description: '',
+    categorie: 'garage',
+    telephone: '',
+    email: '',
+    adresse: '',
+    ville: '',
+    latitude: '',
+    longitude: '',
+    logo: null,
+    horaires: { 
+      lun: '08:00-18:00', 
+      mar: '08:00-18:00', 
+      mer: '08:00-18:00', 
+      jeu: '08:00-18:00', 
+      ven: '08:00-18:00', 
+      sam: '08:00-14:00', 
+      dim: 'Fermé' 
+    }
   });
 
   useEffect(() => {
-    Promise.all([api.get('/gestionnaire/profil'), api.get('/gestionnaire/prestations')])
+    Promise.all([
+      api.get('/gestionnaire/profil'), 
+      api.get('/gestionnaire/prestations')
+    ])
       .then(([p, pr]) => {
-        if (p.data) { setProfil(p.data); setForm({ ...form, ...p.data, horaires: p.data.horaires || form.horaires }); }
+        if (p.data) { 
+          setProfil(p.data); 
+          setForm(prev => ({ 
+            ...prev, 
+            ...p.data, 
+            horaires: p.data.horaires || prev.horaires,
+            logo: p.data.logo || null
+          })); 
+        }
         setPrestations(pr.data);
-      }).finally(() => setLoading(false));
+      })
+      .catch(err => {
+        console.error('Error loading data:', err);
+        setMsg('❌ Erreur lors du chargement des données.');
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const saveProfil = async (e) => {
@@ -196,7 +444,8 @@ export default function GestProfil() {
       await api.put('/gestionnaire/profil', form); 
       setMsg('✅ Profil mis à jour avec succès.');
       setTimeout(() => setMsg(''), 3000);
-    } catch { 
+    } catch (err) { 
+      console.error('Save error:', err);
       setMsg('❌ Erreur lors de la sauvegarde.');
     }
     finally { setSaving(false); }
@@ -205,9 +454,22 @@ export default function GestProfil() {
   const deletePrestation = async (id) => {
     if (!window.confirm('⚠️ Supprimer cette prestation ? Cette action est irréversible.')) return;
     setDeletingId(id);
-    await api.delete(`/gestionnaire/prestations/${id}`);
-    setPrestations(prev => prev.filter(p => p.id !== id));
+    try {
+      await api.delete(`/gestionnaire/prestations/${id}`);
+      setPrestations(prev => prev.filter(p => p.id !== id));
+      setMsg('✅ Prestation supprimée avec succès.');
+      setTimeout(() => setMsg(''), 3000);
+    } catch (err) {
+      console.error('Delete error:', err);
+      setMsg('❌ Erreur lors de la suppression.');
+    }
     setDeletingId(null);
+  };
+
+  const handleLogoUpdate = (logo) => {
+    setForm(prev => ({ ...prev, logo }));
+    setMsg('✅ Logo mis à jour avec succès.');
+    setTimeout(() => setMsg(''), 3000);
   };
 
   const CATS = ['garage','carrosserie','electricite','depannage','assurance','controle_technique','autre'];
@@ -322,9 +584,11 @@ export default function GestProfil() {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className={`alert ${msg.startsWith('✅') ? 'alert-success' : 'alert-error'}`}
+              className="alert"
               style={{ 
                 marginBottom: '20px',
+                padding: '12px 16px',
+                borderRadius: '10px',
                 background: msg.startsWith('✅') ? '#064e3b' : '#7f1d1d',
                 color: msg.startsWith('✅') ? '#10b981' : '#fca5a5',
                 border: `1px solid ${msg.startsWith('✅') ? '#10b981' : '#ef4444'}`
@@ -346,54 +610,116 @@ export default function GestProfil() {
               <div className="card" style={{ padding: '24px', background: '#1a1a1a', border: '1px solid rgba(220, 38, 38, 0.2)', borderRadius: '20px' }}>
                 <h3 style={{ color: '#ef4444', marginBottom: '20px', fontSize: '18px', fontWeight: 600 }}>Informations générales</h3>
                 
+                {/* Logo Upload */}
+                <LogoUpload 
+                  logo={form.logo} 
+                  onLogoUpdate={handleLogoUpdate} 
+                />
+                
                 <div className="form-group">
                   <label className="form-label" style={{ color: '#ef4444' }}>Nom de l'établissement *</label>
-                  <input className="form-input" required value={form.nom} onChange={e => setForm(p => ({...p, nom:e.target.value}))} style={{ background:'#2a2a2a', border:'1px solid #3a3a3a', color:'white' }} />
+                  <input 
+                    className="form-input" 
+                    required 
+                    value={form.nom} 
+                    onChange={e => setForm(p => ({...p, nom: e.target.value}))} 
+                    style={{ background:'#2a2a2a', border:'1px solid #3a3a3a', color:'white' }} 
+                  />
                 </div>
                 
                 <div className="form-group">
                   <label className="form-label" style={{ color: '#ef4444' }}>Catégorie</label>
-                  <select className="form-select" value={form.categorie} onChange={e => setForm(p => ({...p, categorie:e.target.value}))} style={{ background:'#2a2a2a', border:'1px solid #3a3a3a', color:'white' }}>
-                    {CATS.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase()+c.slice(1).replace('_',' ')}</option>)}
+                  <select 
+                    className="form-select" 
+                    value={form.categorie} 
+                    onChange={e => setForm(p => ({...p, categorie: e.target.value}))} 
+                    style={{ background:'#2a2a2a', border:'1px solid #3a3a3a', color:'white' }}
+                  >
+                    {CATS.map(c => (
+                      <option key={c} value={c}>
+                        {c.charAt(0).toUpperCase() + c.slice(1).replace('_', ' ')}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 
                 <div className="form-group">
                   <label className="form-label" style={{ color: '#ef4444' }}>Description</label>
-                  <textarea className="form-textarea" rows={4} value={form.description} onChange={e => setForm(p => ({...p, description:e.target.value}))} style={{ background:'#2a2a2a', border:'1px solid #3a3a3a', color:'white' }} />
+                  <textarea 
+                    className="form-textarea" 
+                    rows={4} 
+                    value={form.description} 
+                    onChange={e => setForm(p => ({...p, description: e.target.value}))} 
+                    style={{ background:'#2a2a2a', border:'1px solid #3a3a3a', color:'white' }} 
+                  />
                 </div>
                 
                 <div className="grid-2">
                   <div className="form-group">
                     <label className="form-label" style={{ color: '#ef4444' }}>Téléphone</label>
-                    <input className="form-input" value={form.telephone} onChange={e => setForm(p => ({...p, telephone:e.target.value}))} style={{ background:'#2a2a2a', border:'1px solid #3a3a3a', color:'white' }} />
+                    <input 
+                      className="form-input" 
+                      value={form.telephone} 
+                      onChange={e => setForm(p => ({...p, telephone: e.target.value}))} 
+                      style={{ background:'#2a2a2a', border:'1px solid #3a3a3a', color:'white' }} 
+                    />
                   </div>
                   <div className="form-group">
                     <label className="form-label" style={{ color: '#ef4444' }}>Email</label>
-                    <input className="form-input" type="email" value={form.email} onChange={e => setForm(p => ({...p, email:e.target.value}))} style={{ background:'#2a2a2a', border:'1px solid #3a3a3a', color:'white' }} />
+                    <input 
+                      className="form-input" 
+                      type="email" 
+                      value={form.email} 
+                      onChange={e => setForm(p => ({...p, email: e.target.value}))} 
+                      style={{ background:'#2a2a2a', border:'1px solid #3a3a3a', color:'white' }} 
+                    />
                   </div>
                 </div>
                 
                 <div className="form-group">
                   <label className="form-label" style={{ color: '#ef4444' }}>Adresse</label>
-                  <input className="form-input" value={form.adresse} onChange={e => setForm(p => ({...p, adresse:e.target.value}))} style={{ background:'#2a2a2a', border:'1px solid #3a3a3a', color:'white' }} />
+                  <input 
+                    className="form-input" 
+                    value={form.adresse} 
+                    onChange={e => setForm(p => ({...p, adresse: e.target.value}))} 
+                    style={{ background:'#2a2a2a', border:'1px solid #3a3a3a', color:'white' }} 
+                  />
                 </div>
                 
                 <div className="grid-2">
                   <div className="form-group">
                     <label className="form-label" style={{ color: '#ef4444' }}>Ville</label>
-                    <input className="form-input" value={form.ville} onChange={e => setForm(p => ({...p, ville:e.target.value}))} style={{ background:'#2a2a2a', border:'1px solid #3a3a3a', color:'white' }} />
+                    <input 
+                      className="form-input" 
+                      value={form.ville} 
+                      onChange={e => setForm(p => ({...p, ville: e.target.value}))} 
+                      style={{ background:'#2a2a2a', border:'1px solid #3a3a3a', color:'white' }} 
+                    />
                   </div>
                 </div>
                 
                 <div className="grid-2">
                   <div className="form-group">
                     <label className="form-label" style={{ color: '#ef4444' }}>Latitude</label>
-                    <input className="form-input" type="number" step="any" value={form.latitude} onChange={e => setForm(p => ({...p, latitude:e.target.value}))} style={{ background:'#2a2a2a', border:'1px solid #3a3a3a', color:'white' }} />
+                    <input 
+                      className="form-input" 
+                      type="number" 
+                      step="any" 
+                      value={form.latitude} 
+                      onChange={e => setForm(p => ({...p, latitude: e.target.value}))} 
+                      style={{ background:'#2a2a2a', border:'1px solid #3a3a3a', color:'white' }} 
+                    />
                   </div>
                   <div className="form-group">
                     <label className="form-label" style={{ color: '#ef4444' }}>Longitude</label>
-                    <input className="form-input" type="number" step="any" value={form.longitude} onChange={e => setForm(p => ({...p, longitude:e.target.value}))} style={{ background:'#2a2a2a', border:'1px solid #3a3a3a', color:'white' }} />
+                    <input 
+                      className="form-input" 
+                      type="number" 
+                      step="any" 
+                      value={form.longitude} 
+                      onChange={e => setForm(p => ({...p, longitude: e.target.value}))} 
+                      style={{ background:'#2a2a2a', border:'1px solid #3a3a3a', color:'white' }} 
+                    />
                   </div>
                 </div>
               </div>
@@ -404,9 +730,21 @@ export default function GestProfil() {
                 type="submit" 
                 disabled={saving} 
                 className="btn btn-gold"
-                style={{ background:'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)', padding: '12px 24px', fontSize: '15px' }}
+                style={{ 
+                  background:'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)', 
+                  padding: '12px 24px', 
+                  fontSize: '15px',
+                  border: 'none',
+                  borderRadius: '10px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
               >
-                <Save size={18} style={{ display: 'inline', marginRight: '8px' }} />
+                <Save size={18} />
                 {saving ? 'Sauvegarde…' : 'Sauvegarder le profil'}
               </motion.button>
             </form>
@@ -428,9 +766,16 @@ export default function GestProfil() {
                 {Object.entries(JOURS).map(([k, label]) => (
                   <div key={k} className="flex gap-md" style={{ alignItems: 'center', marginBottom: '12px' }}>
                     <div style={{ width: '90px', fontWeight: 500, color: '#ef4444' }}>{label}</div>
-                    <input className="form-input" style={{ flex: 1, background:'#2a2a2a', border:'1px solid #3a3a3a', color:'white' }}
-                      value={form.horaires?.[k] || ''} placeholder="08:00-18:00 ou Fermé"
-                      onChange={e => setForm(p => ({ ...p, horaires: { ...p.horaires, [k]: e.target.value } }))} />
+                    <input 
+                      className="form-input" 
+                      style={{ flex: 1, background:'#2a2a2a', border:'1px solid #3a3a3a', color:'white' }}
+                      value={form.horaires?.[k] || ''} 
+                      placeholder="08:00-18:00 ou Fermé"
+                      onChange={e => setForm(p => ({ 
+                        ...p, 
+                        horaires: { ...p.horaires, [k]: e.target.value } 
+                      }))} 
+                    />
                   </div>
                 ))}
               </div>
@@ -441,9 +786,21 @@ export default function GestProfil() {
                 type="submit" 
                 disabled={saving} 
                 className="btn btn-gold"
-                style={{ background:'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)', marginTop: '20px', padding: '12px 24px' }}
+                style={{ 
+                  background:'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)', 
+                  marginTop: '20px', 
+                  padding: '12px 24px',
+                  border: 'none',
+                  borderRadius: '10px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
               >
-                <Save size={18} style={{ display: 'inline', marginRight: '8px' }} />
+                <Save size={18} />
                 {saving ? 'Sauvegarde…' : 'Sauvegarder les horaires'}
               </motion.button>
             </form>
@@ -464,7 +821,17 @@ export default function GestProfil() {
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setModal({})} 
                 className="btn btn-gold"
-                style={{ background:'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)', display: 'flex', alignItems: 'center', gap: '8px' }}
+                style={{ 
+                  background:'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '10px 20px',
+                  color: 'white',
+                  cursor: 'pointer'
+                }}
               >
                 <Plus size={16} /> Ajouter
               </motion.button>
@@ -493,7 +860,14 @@ export default function GestProfil() {
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setModal({})} 
                     className="btn btn-gold"
-                    style={{ background:'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)' }}
+                    style={{ 
+                      background:'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '12px 24px',
+                      color: 'white',
+                      cursor: 'pointer'
+                    }}
                   >
                     Ajouter la première prestation
                   </motion.button>
@@ -507,7 +881,7 @@ export default function GestProfil() {
                   className="grid-2"
                   style={{ gap: '20px' }}
                 >
-                  {prestations.map((p, index) => (
+                  {prestations.map((p) => (
                     <motion.div
                       key={p.id}
                       variants={fadeInUp}
@@ -545,11 +919,21 @@ export default function GestProfil() {
                             background: '#2a2a2a', 
                             color: '#ef4444',
                             fontSize: '11px',
-                            padding: '4px 10px'
+                            padding: '4px 10px',
+                            borderRadius: '20px'
                           }}>
                             {p.categorie}
                           </span>
-                          <span className={`badge ${p.est_disponible ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '11px' }}>
+                          <span 
+                            className="badge" 
+                            style={{ 
+                              fontSize: '11px',
+                              padding: '4px 10px',
+                              borderRadius: '20px',
+                              background: p.est_disponible ? '#064e3b' : '#7f1d1d',
+                              color: p.est_disponible ? '#10b981' : '#fca5a5'
+                            }}
+                          >
                             {p.est_disponible ? 'Disponible' : 'Indisponible'}
                           </span>
                         </div>
@@ -598,7 +982,11 @@ export default function GestProfil() {
                               alignItems: 'center',
                               gap: '6px',
                               background: '#2a2a2a',
-                              color: '#ef4444'
+                              color: '#ef4444',
+                              border: 'none',
+                              borderRadius: '8px',
+                              padding: '8px 12px',
+                              cursor: 'pointer'
                             }}
                           >
                             <Edit2 size={14} /> Modifier
@@ -612,7 +1000,12 @@ export default function GestProfil() {
                               display: 'flex',
                               alignItems: 'center',
                               gap: '6px',
-                              background: '#dc2626'
+                              background: '#dc2626',
+                              border: 'none',
+                              borderRadius: '8px',
+                              padding: '8px 12px',
+                              color: 'white',
+                              cursor: 'pointer'
                             }}
                           >
                             {deletingId === p.id ? (
